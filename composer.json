@@ -1,0 +1,28 @@
+{
+    "name": "waska14/laravel-youtube-converter",
+    "description": "Laravel youtube converter/downloader",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Waska Chaduneli",
+            "email": "waska@chaduneli.com"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Waska\\LaravelYoutubeConverter\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Waska\\LaravelYoutubeConverter\\ServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "dev",
+    "require": {
+        "norkunas/youtube-dl-php": "^2.0"
+    }
+}
