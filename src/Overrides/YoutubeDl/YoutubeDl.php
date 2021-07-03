@@ -55,11 +55,19 @@ class YoutubeDl extends BaseYoutubeDl
         return $this;
     }
 
-    public function getQuietUrls(string $url)
+    public function getQuietUrl(string $url): ?string
     {
-        $process = $this->processBuilder->build($this->binPath, $this->pythonPath, ['--youtube-skip-dash-manifest', '-g', $url]);
+        $process = $this->processBuilder->build($this->binPath, $this->pythonPath, ['--youtube-skip-dash-manifest', '-f', 'best', '-g', $url]);
         $output = $this->getProcessOutput($process);
-        return array_values(array_filter(explode("\n", $output)));
+        return Arr::first(array_values(array_filter(explode("\n", $output))));
+    }
+
+    public function getData(string $url): array
+    {
+        $process = $this->processBuilder->build($this->binPath, $this->pythonPath, ['-j', $url]);
+        $output = $this->getProcessOutput($process);
+        dd(json_decode(trim($output), true));
+        return Arr::first(array_values(array_filter(explode("\n", $output))));
     }
 
     public function getDuration(string $url)
