@@ -2,9 +2,9 @@
 
 namespace Waska\LaravelYoutubeConverter\Overrides\YoutubeDl;
 
-use Carbon\Carbon;
 use Illuminate\Support\Arr;
 use Symfony\Component\Filesystem\Filesystem;
+use Waska\LaravelYoutubeConverter\Exceptions\YoutubeDlRuntimeException;
 use YoutubeDl\Metadata\DefaultMetadataReader;
 use YoutubeDl\Metadata\MetadataReaderInterface;
 use YoutubeDl\Process\DefaultProcessBuilder;
@@ -26,8 +26,10 @@ class YoutubeDl extends BaseYoutubeDl
         $this->processBuilder = $processBuilder ?? new DefaultProcessBuilder();
         $this->metadataReader = $metadataReader ?? new DefaultMetadataReader();
         $this->filesystem = $filesystem ?? new Filesystem();
-        $this->progress = static function (string $progressTarget, string $percentage, string $size, ?string $speed, ?string $eta, ?string $totalTime): void {};
-        $this->debug = static function (string $type, string $buffer): void {};
+        $this->progress = static function (string $progressTarget, string $percentage, string $size, ?string $speed, ?string $eta, ?string $totalTime): void {
+        };
+        $this->debug = static function (string $type, string $buffer): void {
+        };
         parent::__construct($processBuilder, $metadataReader, $filesystem);
     }
 
@@ -62,12 +64,11 @@ class YoutubeDl extends BaseYoutubeDl
         return Arr::first(array_values(array_filter(explode("\n", $output))));
     }
 
-    public function getData(string $url): array
+    public function getData(string $url): ?array
     {
         $process = $this->processBuilder->build($this->binPath, $this->pythonPath, ['-j', $url]);
         $output = $this->getProcessOutput($process);
-        dd(json_decode(trim($output), true));
-        return Arr::first(array_values(array_filter(explode("\n", $output))));
+        return json_decode(trim($output), true);
     }
 
     public function getDuration(string $url)
@@ -102,7 +103,7 @@ class YoutubeDl extends BaseYoutubeDl
         $output = null;
         $process->run(function ($type, $value) use (&$output) {
             if ($type == 'err') {
-                dd($value);
+                throw new YoutubeDlRuntimeException($value);
             }
             $output = $value;
         });
