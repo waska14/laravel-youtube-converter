@@ -31,6 +31,12 @@ class YoutubeDl extends BaseYoutubeDl
         $this->debug = static function (string $type, string $buffer): void {
         };
         parent::__construct($processBuilder, $metadataReader, $filesystem);
+        if ($path = config('laravel-youtube-converter.bin_path')) {
+            $this->setBinPath($path);
+        }
+        if ($path = config('laravel-youtube-converter.python_path')) {
+            $this->setPythonPath($path);
+        }
     }
 
     public function setBinPath(?string $binPath): self
@@ -101,6 +107,9 @@ class YoutubeDl extends BaseYoutubeDl
     protected function getProcessOutput($process)
     {
         $output = null;
+        $process->setEnv([
+            'LC_ALL' => config('laravel-youtube-converter.lc_all'),
+        ]);
         $process->run(function ($type, $value) use (&$output) {
             if ($type == 'err') {
                 throw new YoutubeDlRuntimeException($value);
