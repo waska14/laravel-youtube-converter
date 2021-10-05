@@ -95,6 +95,12 @@ class YoutubeDl extends BaseYoutubeDl
                 $videoUrl
             ]));
             $output = $this->getProcessOutput($process);
+            $data = array_filter(preg_split('/[\r\n]/', $output));
+            if (count($data) == 4) {
+                $data = array_combine(['title', 'id', 'url', 'format'], $data);
+            } else {
+                $data = array_combine(['warning', 'title', 'id', 'url', 'format'], $data);
+            }
             $data = array_combine([
                 'title', 'id', 'url', 'format'
             ], array_filter(preg_split('/[\r\n]/', $output)));
