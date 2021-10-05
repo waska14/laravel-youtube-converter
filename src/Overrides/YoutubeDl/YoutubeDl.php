@@ -94,8 +94,15 @@ class YoutubeDl extends BaseYoutubeDl
                 '--youtube-skip-hls-manifest',
                 $videoUrl
             ]));
-            $output = $this->getProcessOutput($process);
-            $data = array_filter(preg_split('/[\r\n]/', $output));
+            for ($i = 0; $i < 5; $i++) {
+                $output = $this->getProcessOutput($process);
+                $data = array_filter(preg_split('/[\r\n]/', $output));
+                if (count($data) < 4 || count($data) > 5) {
+                    sleep(1); // Try again in 5 seconds
+                } else {
+                    break;
+                }
+            }
             if (count($data) == 4) {
                 $data = array_combine(['title', 'id', 'url', 'format'], $data);
             } else {
