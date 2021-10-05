@@ -76,14 +76,21 @@ class YoutubeDl extends BaseYoutubeDl
     public function getData(string $videoUrl): ?array
     {
         if (!Cache::get($videoUrl)) {
-            $cookieParams = [];
+            $params = [];
             if ($cookiePath = config('laravel-youtube-converter.cookies_path')) {
-                $cookieParams = [
+                $params = [
                     '--cookies',
                     $cookiePath
                 ];
             }
-            $process = $this->processBuilder->build($this->binPath, $this->pythonPath, array_merge($cookieParams, [
+            // Include playlist index
+            try {
+                parse_str(parse_url($videoUrl)['query'], $query);
+                if (Arr::has($query, 'index')) {
+                    $params = array_merge($params, ['--playlist-items', $query['index']]);
+                }
+            } catch (\Throwable $e) {}
+            $process = $this->processBuilder->build($this->binPath, $this->pythonPath, array_merge($params, [
                 '-f',
                 'best',
                 '--get-url',
