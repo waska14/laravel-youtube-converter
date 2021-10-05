@@ -3,6 +3,9 @@
 namespace Waska\LaravelYoutubeConverter\Overrides\YoutubeDl;
 
 use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Symfony\Component\Filesystem\Filesystem;
 use Waska\LaravelYoutubeConverter\Exceptions\YoutubeDlRuntimeException;
 use YoutubeDl\Metadata\DefaultMetadataReader;
@@ -70,11 +73,49 @@ class YoutubeDl extends BaseYoutubeDl
         return Arr::first(array_values(array_filter(explode("\n", $output))));
     }
 
-    public function getData(string $url): ?array
+    public function getData(string $videoUrl): ?array
     {
-        $process = $this->processBuilder->build($this->binPath, $this->pythonPath, ['-j', $url]);
-        $output = $this->getProcessOutput($process);
-        return json_decode(trim($output), true);
+        if (!Cache::get($videoUrl)) {
+            $cookieParams = [];
+            if ($cookiePath = config('laravel-youtube-converter.cookies_path')) {
+                $cookieParams = [
+                    '--cookies',
+                    $cookiePath
+                ];
+            }
+            $process = $this->processBuilder->build($this->binPath, $this->pythonPath, array_merge($cookieParams, [
+                '-f',
+                'best',
+                '--get-url',
+                '--get-title',
+                '--get-id',
+                '--get-format',
+                '--youtube-skip-dash-manifest',
+                '--youtube-skip-hls-manifest',
+                $videoUrl
+            ]));
+            $output = $this->getProcessOutput($process);
+            $data = array_combine([
+                'title', 'id', 'url', 'format'
+            ], array_filter(preg_split('/[\r\n]/', $output)));
+            $url = $data['url'];
+
+            $data['format'] = Str::afterLast(Str::beforeLast($data['format'], ' '), ' ');
+            list($data['width'], $data['height']) = explode('x', $data['format']);
+
+            if ($parsed = parse_url($data['url'])) {
+                $query = Arr::get($parsed, 'query');
+                parse_str($query, $query);
+                if ($expire = Arr::get($query, 'expire')) {
+                    $expire = Carbon::createFromTimestamp($expire);
+                    if ($expire && $expire > now()) {
+                        Cache::put($videoUrl, $data, $expire);
+                    }
+                }
+            }
+        }
+
+        return Cache::get($videoUrl) ?: $data;
     }
 
     public function getDuration(string $url)
