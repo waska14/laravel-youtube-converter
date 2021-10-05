@@ -86,8 +86,8 @@ class YoutubeDl extends BaseYoutubeDl
             // Include playlist index
             try {
                 parse_str(parse_url($videoUrl)['query'], $query);
-                if (Arr::has($query, 'index')) {
-                    $params = array_merge($params, ['--playlist-items', $query['index']]);
+                if (Arr::has($query, 'list')) {
+                    $params = array_merge($params, ['--playlist-items', Arr::get($query, 'index') ?: 1]);
                 }
             } catch (\Throwable $e) {}
             $process = $this->processBuilder->build($this->binPath, $this->pythonPath, array_merge($params, [
