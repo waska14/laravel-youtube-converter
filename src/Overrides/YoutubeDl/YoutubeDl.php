@@ -68,7 +68,7 @@ class YoutubeDl extends BaseYoutubeDl
 
     public function getQuietUrl(string $url): ?string
     {
-        $process = $this->processBuilder->build($this->binPath, $this->pythonPath, ['--youtube-skip-dash-manifest', '-f', 'best', '-g', $url]);
+        $process = $this->processBuilder->build($this->binPath, $this->pythonPath, ['--youtube-skip-dash-manifest', '-f', 'b', '-g', $url]);
         $output = $this->getProcessOutput($process);
         return Arr::first(array_values(array_filter(explode("\n", $output))));
     }
@@ -92,7 +92,7 @@ class YoutubeDl extends BaseYoutubeDl
             } catch (\Throwable $e) {}
             $process = $this->processBuilder->build($this->binPath, $this->pythonPath, array_merge($params, [
                 '-f',
-                'best',
+                'b',
                 '--get-url',
                 '--get-title',
                 '--get-id',
