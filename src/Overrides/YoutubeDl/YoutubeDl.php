@@ -89,7 +89,8 @@ class YoutubeDl extends BaseYoutubeDl
                 if (Arr::has($query, 'list')) {
                     $params = array_merge($params, ['--playlist-items', Arr::get($query, 'index') ?: 1]);
                 }
-            } catch (\Throwable $e) {}
+            } catch (\Throwable $e) {
+            }
             $process = $this->processBuilder->build($this->binPath, $this->pythonPath, array_merge($params, [
                 '-f',
                 'b',
@@ -152,7 +153,8 @@ class YoutubeDl extends BaseYoutubeDl
             if (Arr::has($query, 'list')) {
                 $params = array_merge($params, ['--playlist-items', Arr::get($query, 'index') ?: 1]);
             }
-        } catch (\Throwable $e) {}
+        } catch (\Throwable $e) {
+        }
         $process = $this->processBuilder->build($this->binPath, $this->pythonPath, array_merge($params, [
             '-f',
             'b',
@@ -182,7 +184,13 @@ class YoutubeDl extends BaseYoutubeDl
             $subtitles = str_replace($rnd, '\'', $subtitles);
 
             $data['subtitles'] = collect(json_decode($subtitles, true))->map(function (array $subtitle) use ($subtitleFormat) {
-                return collect($subtitle)->filter(fn ($formatData) => $formatData['ext'] === $subtitleFormat)->first();
+                return collect($subtitle)
+                    ->filter(function ($formatData) use ($subtitleFormat) {
+                        return is_array($formatData) && Str::lower(Arr::get($formatData, 'ext')) == Str::lower($subtitleFormat);
+                    })
+                    ->first();
+            })->filter(function ($item) {
+                return is_array($item) && Arr::has($item, ['url', 'name']);
             })->map(function (array $item) {
                 return Arr::only($item, ['url', 'name']);
             })->all();
