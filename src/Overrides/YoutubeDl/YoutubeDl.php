@@ -138,6 +138,61 @@ class YoutubeDl extends BaseYoutubeDl
         return Cache::get($videoUrl) ?: $data;
     }
 
+    public function getVideoAndSubtitles(string $videoUrl, string $subtitleFormat = 'vtt'): ?array
+    {
+        $params = [];
+        if ($cookiePath = config('laravel-youtube-converter.cookies_path')) {
+            $params = [
+                '--cookies',
+                $cookiePath
+            ];
+        }
+        // Include playlist index
+        try {
+            parse_str(parse_url($videoUrl)['query'], $query);
+            if (Arr::has($query, 'list')) {
+                $params = array_merge($params, ['--playlist-items', Arr::get($query, 'index') ?: 1]);
+            }
+        } catch (\Throwable $e) {}
+        $process = $this->processBuilder->build($this->binPath, $this->pythonPath, array_merge($params, [
+            '-f',
+            'b',
+            '--get-url',
+            '--youtube-skip-dash-manifest',
+            '--youtube-skip-hls-manifest',
+            '--convert-subs',
+            'vtt',
+            $videoUrl,
+            '--print',
+            "%(subtitles)s",
+        ]));
+        for ($i = 0; $i < 5; $i++) {
+            $output = $this->getProcessOutput($process);
+            $data = array_filter(preg_split('/[\r\n]/', $output));
+            if (count($data) != 2) {
+                sleep(1); // Try again
+            } else {
+                break;
+            }
+        }
+        if (count($data) == 2) {
+            $data = array_combine(['subtitles', 'url'], $data);
+            $rnd = '|' . Str::random(60) . 'waska|';
+            $subtitles = str_replace("\\'", $rnd, $data['subtitles']);
+            $subtitles = str_replace('\'', '"', $subtitles);
+            $subtitles = str_replace($rnd, '\'', $subtitles);
+
+            $data['subtitles'] = collect(json_decode($subtitles, true))->map(function (array $subtitle) use ($subtitleFormat) {
+                return collect($subtitle)->filter(fn ($formatData) => $formatData['ext'] === $subtitleFormat)->first();
+            })->map(function (array $item) {
+                return Arr::only($item, ['url', 'name']);
+            })->all();
+
+            return $data;
+        }
+        return null;
+    }
+
     public function getDuration(string $url)
     {
         $process = $this->processBuilder->build($this->binPath, $this->pythonPath, ['--get-duration', $url]);
