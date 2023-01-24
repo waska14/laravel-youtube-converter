@@ -105,8 +105,11 @@ class YoutubeDl extends BaseYoutubeDl
                 $output = $this->getProcessOutput($process);
                 $data = array_filter(preg_split('/[\r\n]/', $output));
                 if (count($data) < 4 || count($data) > 5) {
-                    sleep(1); // Try again in 5 seconds
+                    sleep(1); // Try again
                 } else {
+                    if ($i == 4) {
+                        return null;
+                    }
                     break;
                 }
             }
@@ -115,10 +118,6 @@ class YoutubeDl extends BaseYoutubeDl
             } else {
                 $data = array_combine(['warning', 'title', 'id', 'url', 'format'], $data);
             }
-            $data = array_combine([
-                'title', 'id', 'url', 'format'
-            ], array_filter(preg_split('/[\r\n]/', $output)));
-            $url = $data['url'];
 
             $data['format'] = Str::afterLast(Str::beforeLast($data['format'], ' '), ' ');
             list($data['width'], $data['height']) = explode('x', $data['format']);
