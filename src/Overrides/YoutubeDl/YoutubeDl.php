@@ -94,6 +94,7 @@ class YoutubeDl extends BaseYoutubeDl
             $process = $this->processBuilder->build($this->binPath, $this->pythonPath, array_merge($params, [
                 '-f',
                 'b',
+                '--no-warnings',
                 '--get-url',
                 '--get-title',
                 '--get-id',
