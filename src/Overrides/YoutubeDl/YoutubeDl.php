@@ -5,6 +5,7 @@ namespace Waska\LaravelYoutubeConverter\Overrides\YoutubeDl;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Symfony\Component\Filesystem\Filesystem;
 use Waska\LaravelYoutubeConverter\Exceptions\YoutubeDlRuntimeException;
@@ -75,15 +76,15 @@ class YoutubeDl extends BaseYoutubeDl
 
     public function getData(string $videoUrl): ?array
     {
-        if (!Cache::get($videoUrl)) {
+        $cacheKey = $this->getCacheKey($videoUrl);
+        $data = null;
+        if (!Cache::get($cacheKey)) {
             $params = [];
             if ($cookiePath = config('laravel-youtube-converter.cookies_path')) {
-                $params = [
-                    '--cookies',
-                    $cookiePath
-                ];
+                $params = ['--cookies', $cookiePath];
             }
-            // Include playlist index
+
+            // Include youtube playlist index
             try {
                 parse_str(parse_url($videoUrl)['query'], $query);
                 if (Arr::has($query, 'list')) {
@@ -91,6 +92,7 @@ class YoutubeDl extends BaseYoutubeDl
                 }
             } catch (\Throwable $e) {
             }
+
             $process = $this->processBuilder->build($this->binPath, $this->pythonPath, array_merge($params, [
                 '-f',
                 'b',
@@ -98,45 +100,53 @@ class YoutubeDl extends BaseYoutubeDl
                 '--get-url',
                 '--get-title',
                 '--get-id',
-                '--get-format',
                 '--youtube-skip-dash-manifest',
                 '--youtube-skip-hls-manifest',
                 $videoUrl
             ]));
+
+            $output = $this->getProcessOutput($process);
+            $data = array_filter(preg_split('/[\r\n]/', $output));
+
+            // Try max 5 times, because sometimes yt-dlp returns only url of the video without title and id.
             for ($i = 0; $i < 5; $i++) {
-                $output = $this->getProcessOutput($process);
-                $data = array_filter(preg_split('/[\r\n]/', $output));
-                if (count($data) < 4 || count($data) > 5) {
-                    sleep(1); // Try again
-                } else {
-                    if ($i == 4) {
-                        return null;
-                    }
+                if (count($data) === 3) {
                     break;
                 }
-            }
-            if (count($data) == 4) {
-                $data = array_combine(['title', 'id', 'url', 'format'], $data);
-            } else {
-                $data = array_combine(['warning', 'title', 'id', 'url', 'format'], $data);
+                sleep(1);
             }
 
-            $data['format'] = Str::afterLast(Str::beforeLast($data['format'], ' '), ' ');
-            list($data['width'], $data['height']) = explode('x', $data['format']);
+            if (count($data) !== 3) {
+                Log::error('YoutubeDl file data was not found: ' . $videoUrl, $data);
+                return null;
+            }
 
-            if ($parsed = parse_url($data['url'])) {
-                $query = Arr::get($parsed, 'query');
-                parse_str($query, $query);
-                if ($expire = Arr::get($query, 'expire')) {
-                    $expire = Carbon::createFromTimestamp($expire);
-                    if ($expire && $expire > now()) {
-                        Cache::put($videoUrl, $data, $expire);
+            $data = array_combine(['title', 'id', 'url'], $data);
+
+            // Attempt to extract the expiration time from the video URL.
+            // If an expiration time is found, cache the URL for that duration to prevent redundant endpoint calls.
+            try {
+                if ($parsed = parse_url($data['url'])) {
+                    $query = Arr::get($parsed, 'query');
+                    parse_str($query, $query);
+                    if ($expire = Arr::get($query, 'expire')) {
+                        $expire = Carbon::createFromTimestamp($expire);
+                        if ($expire && $expire > now()) {
+                            Cache::put($cacheKey, $data, $expire);
+                        }
                     }
                 }
+            } catch (\Throwable $e) {
+                return $data;
             }
         }
 
-        return Cache::get($videoUrl) ?: $data;
+        return Cache::get($cacheKey) ?: $data;
+    }
+
+    public function getCacheKey(string $videoUrl): string
+    {
+        return sprintf('YoutubeDl:%s', md5($videoUrl));
     }
 
     public function getVideoAndSubtitles(string $videoUrl, string $subtitleFormat = 'vtt'): ?array
