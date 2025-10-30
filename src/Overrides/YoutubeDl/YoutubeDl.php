@@ -79,41 +79,43 @@ class YoutubeDl extends BaseYoutubeDl
         $cacheKey = $this->getCacheKey($videoUrl);
         $data = null;
         if (!Cache::get($cacheKey)) {
-            $params = [];
-            if ($cookiePath = config('laravel-youtube-converter.cookies_path')) {
-                $params = ['--cookies', $cookiePath];
-            }
+            for ($i = 0; $i < 10; $i++) {
+                try {
+                    $params = [];
+                    // $i % 2 === 1 means that first try without cookies, then with cookies
+                    if ($i % 2 === 1 && ($cookiePath = config('laravel-youtube-converter.cookies_path'))) {
+                        $params = ['--cookies', $cookiePath];
+                    }
 
-            // Include youtube playlist index
-            try {
-                parse_str(parse_url($videoUrl)['query'], $query);
-                if (Arr::has($query, 'list')) {
-                    $params = array_merge($params, ['--playlist-items', Arr::get($query, 'index') ?: 1]);
-                }
-            } catch (\Throwable $e) {
-            }
+                    // Include youtube playlist index
+                    try {
+                        parse_str(parse_url($videoUrl)['query'], $query);
+                        if (Arr::has($query, 'list')) {
+                            $params = array_merge($params, ['--playlist-items', Arr::get($query, 'index') ?: 1]);
+                        }
+                    } catch (\Throwable $e) {
+                    }
 
-            $process = $this->processBuilder->build($this->binPath, $this->pythonPath, array_merge($params, [
-                '-f',
-                '(best[height<=1080][ext=mp4][protocol=https]/best[ext=mp4][protocol=https]/best[protocol=https][ext!=webm])[protocol!=m3u8]', // b
-                '--no-warnings',
-                '--get-url',
-                '--get-title',
-                '--get-id',
+                    $process = $this->processBuilder->build($this->binPath, $this->pythonPath, array_merge($params, [
+                        '-f',
+                        '(22/18/best[ext=mp4]]',
+                        '--no-warnings',
+                        '--get-url',
+                        '--get-title',
+                        '--get-id',
 //                '--youtube-skip-dash-manifest',
 //                '--youtube-skip-hls-manifest',
-                $videoUrl
-            ]));
+                        $videoUrl
+                    ]));
 
-            $output = $this->getProcessOutput($process);
-            $data = array_filter(preg_split('/[\r\n]/', $output));
+                    $output = $this->getProcessOutput($process);
+                    $data = array_filter(preg_split('/[\r\n]/', $output));
 
-            // Try max 5 times, because sometimes yt-dlp returns only url of the video without title and id.
-            for ($i = 0; $i < 5; $i++) {
-                if (count($data) === 3) {
-                    break;
+                    if (count($data) === 3) {
+                        break;
+                    }
+                } catch (\Throwable $e) {
                 }
-                sleep(1);
             }
 
             if (count($data) !== 3) {
